@@ -2,7 +2,7 @@
 
 CDP/Metro bridge for React Native development tooling. Provides target discovery, a WebSocket CDP session, a proxy multiplexer, a high-level bridge API, DevTools launcher, and an optional app-side client SDK.
 
-Used by [metro-mcp](https://github.com/steve228uk/metro-mcp) and [playwright-react-native](https://github.com/steve228uk/playwright-react-native).
+Used by [metro-mcp](https://github.com/steve228uk/metro-mcp).
 
 ## Installation
 
@@ -205,17 +205,6 @@ import {
   ClientBuffer,
 } from 'metro-bridge/client'
 ```
-
-## Migrating from metro-mcp
-
-| Before (metro-mcp) | After (metro-bridge) |
-|---|---|
-| `CDPClient` | `CDPSession` |
-| `CDPProxy` (multiplexer) | `CDPMultiplexer` |
-| `fetchTargets`, `selectBestTarget` | Same names, exported from `metro-bridge` |
-| `MetroMCPClient` | `MetroBridgeClient` |
-| `__METRO_MCP__` global | `__METRO_BRIDGE__` global |
-| `import from 'metro-mcp/client'` | `import from 'metro-bridge/client'` |
 
 ## License
 
