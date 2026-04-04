@@ -1,0 +1,67 @@
+{
+  "name": "metro-bridge",
+  "version": "0.1.0",
+  "description": "CDP/Metro bridge for React Native: target discovery, WebSocket session, multiplexer, DevTools launcher, and app-side SDK",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "bun run clean && bun run build:js && bun run build:types",
+    "build:js": "bun build src/index.ts --outdir dist --target node --external ws --external chrome-launcher --external chromium-edge-launcher && bun build src/client/index.ts --outdir dist/client --target browser",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
+  "optionalDependencies": {
+    "chrome-launcher": "^1.2.1",
+    "chromium-edge-launcher": "^0.3.0"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.70.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/ws": "^8.18.0",
+    "typescript": "^5.8.0"
+  },
+  "keywords": [
+    "react-native",
+    "metro",
+    "cdp",
+    "chrome-devtools-protocol",
+    "hermes",
+    "debugging",
+    "websocket"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/steve228uk/metro-bridge"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
