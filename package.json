@@ -58,7 +58,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/steve228uk/metro-bridge"
+    "url": "git+https://github.com/steve228uk/metro-bridge.git"
+  },
+  "homepage": "https://github.com/steve228uk/metro-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/steve228uk/metro-bridge/issues"
   },
   "engines": {
     "node": ">=18.0.0"
