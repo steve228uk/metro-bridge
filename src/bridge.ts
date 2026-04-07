@@ -92,7 +92,7 @@ export class MetroBridge {
               try {
                 const { InteractionManager } = require('react-native');
                 InteractionManager.runAfterInteractions(() => resolve(true));
-              } catch (_) {
+              } catch {
                 resolve(true);
               }
             })
