@@ -89,8 +89,12 @@ export class MetroBridge {
         const idle = await Promise.race([
           this.evaluate<boolean>(`
             new Promise(resolve => {
-              const { InteractionManager } = require('react-native');
-              InteractionManager.runAfterInteractions(() => resolve(true));
+              try {
+                const { InteractionManager } = require('react-native');
+                InteractionManager.runAfterInteractions(() => resolve(true));
+              } catch (_) {
+                resolve(true);
+              }
             })
           `),
           new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 500)),
