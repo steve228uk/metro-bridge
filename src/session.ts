@@ -103,6 +103,10 @@ export class CDPSession {
         });
 
         this.ws.on('message', (data) => {
+          // Any incoming message proves the connection is alive — update lastPingAt
+          // so the keepalive doesn't close connections where Metro doesn't send
+          // WebSocket-level pings (e.g. debugger connections on RN 0.75+).
+          this.lastPingAt = Date.now();
           this.handleMessage(wsDataToString(data));
         });
 
@@ -126,8 +130,10 @@ export class CDPSession {
           }
         });
 
-        // Metro's InspectorProxy sends pings every 5s — ws auto-responds with pong.
-        // Track the last ping time so keepalive can detect a silently dead connection.
+        // Metro's InspectorProxy sends WebSocket pings on device connections
+        // (/inspector/device) but not on debugger connections (/inspector/debug).
+        // We update lastPingAt on every message too, so the keepalive doesn't
+        // incorrectly close an active debugger session.
         this.ws.on('ping', () => {
           this.lastPingAt = Date.now();
           logger.debug('Received ping from Metro');
