@@ -50,6 +50,14 @@ export class CDPMultiplexer {
   ) {
     this.protectedDomains = new Set(options?.protectedDomains ?? []);
 
+    const target = cdpSession.getTarget();
+    if (target?.reactNative?.capabilities?.supportsMultipleDebuggers) {
+      logger.debug(
+        'CDPMultiplexer is not needed: target reports supportsMultipleDebuggers=true. ' +
+        'On RN 0.85+ Metro handles multiple concurrent connections natively.',
+      );
+    }
+
     // Install the message interceptor on CDPSession to intercept responses
     // destined for external clients and broadcast events.
     cdpSession.messageInterceptor = (parsed: CDPResponse, raw: string) =>

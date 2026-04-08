@@ -5,6 +5,7 @@ export {
   selectBestTarget,
   scanMetroPorts,
   checkMetroStatus,
+  supportsMultipleDebuggers,
 } from './discovery.js';
 export { CDPMultiplexer } from './multiplexer.js';
 export { MetroBridge } from './bridge.js';

@@ -96,33 +96,53 @@ const running = await discovery.isMetroRunning()
 const targets = await fetchTargets('127.0.0.1', 8081)
 const best = selectBestTarget(targets) // prefers Bridgeless > Hermes > standard
 const servers = await scanMetroPorts('127.0.0.1') // scans common ports
+
+// Check if the target supports native multi-session (RN 0.85+)
+if (supportsMultipleDebuggers(best)) {
+  // Multiple CDPSessions can connect to Metro directly — no CDPMultiplexer needed
+}
 ```
 
 ### CDPMultiplexer — share one Hermes connection
 
-Allows Chrome DevTools and your tooling to share a single Hermes debugger connection:
+On **RN 0.85+**, Metro's inspector proxy supports multiple concurrent debugger
+connections natively (signalled by `supportsMultipleDebuggers: true` in the
+target's capabilities). In that case, Chrome DevTools and your `CDPSession` can
+each connect to Metro directly — no multiplexer required.
+
+On **RN <0.85**, only one debugger can hold the connection at a time. Use
+`CDPMultiplexer` to share a single upstream connection across multiple consumers:
 
 ```ts
-import { CDPSession, MetroDiscovery, CDPMultiplexer, openDevTools } from 'metro-bridge'
+import {
+  CDPSession, MetroDiscovery, CDPMultiplexer, openDevTools,
+  selectBestTarget, supportsMultipleDebuggers,
+} from 'metro-bridge'
 
 const discovery = new MetroDiscovery(8081)
-const session = await discovery.attach()
+const target = selectBestTarget(await discovery.discover())
 
-// Start the multiplexer — accepts external WebSocket clients
-const multiplexer = new CDPMultiplexer(session, {
-  // Domains that your code needs and should never be disabled by external clients
-  protectedDomains: ['Runtime', 'Network'],
-})
-const port = await multiplexer.start()
+if (supportsMultipleDebuggers(target)) {
+  // RN 0.85+: connect directly — DevTools and your CDPSession coexist without a proxy
+  const session = await CDPSession.connect(target)
+  const frontendUrl = `http://localhost:8081/debugger-frontend/rn_fusebox.html?ws=${new URL(target.webSocketDebuggerUrl).host}`
+  await openDevTools(frontendUrl)
+} else {
+  // RN <0.85: multiplex the single upstream connection
+  const session = await CDPSession.connect(target)
+  const multiplexer = new CDPMultiplexer(session, {
+    // Domains that your code needs and should never be disabled by external clients
+    protectedDomains: ['Runtime', 'Network'],
+  })
+  const port = await multiplexer.start()
+  const frontendUrl = `http://localhost:8081/debugger-frontend/rn_fusebox.html?ws=127.0.0.1:${port}`
+  await openDevTools(frontendUrl)
 
-// Open Chrome DevTools pointed at the multiplexer
-const frontendUrl = `http://localhost:8081/debugger-frontend/rn_fusebox.html?ws=127.0.0.1:${port}`
-await openDevTools(frontendUrl)
+  // Your code can still use the session directly
+  await session.send('Runtime.evaluate', { expression: 'Date.now()', returnByValue: true })
 
-// Your code can still use the session directly
-await session.send('Runtime.evaluate', { expression: 'Date.now()', returnByValue: true })
-
-await multiplexer.stop()
+  await multiplexer.stop()
+}
 ```
 
 ### openDevTools

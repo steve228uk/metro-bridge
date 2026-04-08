@@ -71,6 +71,16 @@ export async function scanMetroPorts(
 }
 
 /**
+ * Returns true if the target is running on RN 0.85+ and Metro's inspector
+ * proxy supports native multi-session. When true, multiple CDPSessions
+ * (e.g. metro-bridge + Chrome DevTools) can connect to Metro concurrently
+ * without a CDPMultiplexer.
+ */
+export function supportsMultipleDebuggers(target: MetroTarget): boolean {
+  return target.reactNative?.capabilities?.supportsMultipleDebuggers === true;
+}
+
+/**
  * Check if Metro is running on the given host/port.
  */
 export async function checkMetroStatus(host: string, port: number): Promise<string | null> {
