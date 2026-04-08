@@ -16,8 +16,10 @@ export interface MetroTarget {
     capabilities?: {
       nativePageReloads?: boolean;
       nativeSourceCodeFetching?: boolean;
-      /** true = New Architecture / Fusebox inspector */
+      /** true = New Architecture / Fusebox inspector (RN <0.85) */
       prefersFuseboxFrontend?: boolean;
+      /** true = RN 0.85+ — Metro handles multiple concurrent debugger sessions natively */
+      supportsMultipleDebuggers?: boolean;
     };
   };
   vm?: string;
