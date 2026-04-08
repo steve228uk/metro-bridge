@@ -80,7 +80,18 @@ export class CDPSession {
     }
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(url);
+        // Metro's inspector proxy validates the Origin header on WebSocket upgrade
+        // requests (RN 0.75+). Without it the server returns 401. Derive the origin
+        // from the target URL so it works regardless of host/port configuration.
+        const wsOrigin = (() => {
+          try {
+            const u = new URL(url.replace(/^wss?:\/\//, (m) => (m === 'wss://' ? 'https://' : 'http://')));
+            return `${u.protocol}//${u.host}`;
+          } catch {
+            return 'http://localhost:8081';
+          }
+        })();
+        this.ws = new WebSocket(url, { headers: { Origin: wsOrigin } });
         const socketForThisConnection = this.ws;
 
         this.ws.on('open', () => {
