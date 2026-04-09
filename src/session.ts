@@ -40,7 +40,9 @@ export class CDPSession {
    */
   messageInterceptor: ((parsed: CDPResponse, raw: string) => boolean) | null = null;
 
-  private readonly requestTimeout = 10000;
+  // 30s timeout: Fusebox (RN 0.77–0.84) may take longer than the classic Hermes
+  // inspector to acknowledge domain-enable commands during JS context initialisation.
+  private readonly requestTimeout = 30000;
   private readonly keepAliveInterval = 10000;
 
   /**
@@ -80,18 +82,7 @@ export class CDPSession {
     }
     return new Promise((resolve, reject) => {
       try {
-        // Metro's inspector proxy validates the Origin header on WebSocket upgrade
-        // requests (RN 0.75+). Without it the server returns 401. Derive the origin
-        // from the target URL so it works regardless of host/port configuration.
-        const wsOrigin = (() => {
-          try {
-            const u = new URL(url.replace(/^wss?:\/\//, (m) => (m === 'wss://' ? 'https://' : 'http://')));
-            return `${u.protocol}//${u.host}`;
-          } catch {
-            return 'http://localhost:8081';
-          }
-        })();
-        this.ws = new WebSocket(url, { headers: { Origin: wsOrigin } });
+        this.ws = new WebSocket(url);
         const socketForThisConnection = this.ws;
 
         this.ws.on('open', () => {
@@ -103,10 +94,6 @@ export class CDPSession {
         });
 
         this.ws.on('message', (data) => {
-          // Any incoming message proves the connection is alive — update lastPingAt
-          // so the keepalive doesn't close connections where Metro doesn't send
-          // WebSocket-level pings (e.g. debugger connections on RN 0.75+).
-          this.lastPingAt = Date.now();
           this.handleMessage(wsDataToString(data));
         });
 
@@ -131,9 +118,9 @@ export class CDPSession {
         });
 
         // Metro's InspectorProxy sends WebSocket pings on device connections
-        // (/inspector/device) but not on debugger connections (/inspector/debug).
-        // We update lastPingAt on every message too, so the keepalive doesn't
-        // incorrectly close an active debugger session.
+        // (/inspector/device) but NOT on debugger connections (/inspector/debug).
+        // Only update lastPingAt on actual WebSocket pings so the keepalive
+        // correctly detects dead connections and triggers a reconnect.
         this.ws.on('ping', () => {
           this.lastPingAt = Date.now();
           logger.debug('Received ping from Metro');
@@ -232,7 +219,9 @@ export class CDPSession {
     this.keepAliveTimer = setInterval(() => {
       if (!this._isConnected || !this.ws) return;
 
-      // Metro sends pings every 5s. If we haven't received one in 20s the connection is dead.
+      // Metro sends pings on device connections but not on debugger connections.
+      // Use a generous timeout so the keepalive doesn't interfere with normal CDP
+      // request/response cycles on long-lived debugger sessions.
       const elapsed = Date.now() - this.lastPingAt;
       if (elapsed > 120000) {
         logger.warn(`No ping received from Metro in ${elapsed}ms — closing connection`);

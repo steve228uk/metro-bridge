@@ -77,6 +77,12 @@ export async function scanMetroPorts(
  * proxy supports native multi-session. When true, multiple CDPSessions
  * (e.g. metro-bridge + Chrome DevTools) can connect to Metro concurrently
  * without a CDPMultiplexer.
+ *
+ * Note: the presence of `prefersFuseboxFrontend` or `devtoolsFrontendUrl`
+ * does NOT imply multiple debugger support. Fusebox is used in RN <0.85
+ * (New Architecture / Bridgeless) but still enforces a single debugger
+ * connection. Only the explicit `supportsMultipleDebuggers` capability,
+ * added in RN 0.85, enables concurrent connections natively.
  */
 export function supportsMultipleDebuggers(target: MetroTarget): boolean {
   return target.reactNative?.capabilities?.supportsMultipleDebuggers === true;
