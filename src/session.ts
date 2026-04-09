@@ -234,7 +234,7 @@ export class CDPSession {
 
       // Metro sends pings every 5s. If we haven't received one in 20s the connection is dead.
       const elapsed = Date.now() - this.lastPingAt;
-      if (elapsed > 20000) {
+      if (elapsed > 120000) {
         logger.warn(`No ping received from Metro in ${elapsed}ms — closing connection`);
         try { this.ws.close(); } catch {}
       }
