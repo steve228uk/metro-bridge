@@ -1,6 +1,6 @@
 {
   "name": "metro-bridge",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "CDP/Metro bridge for React Native: target discovery, WebSocket session, multiplexer, DevTools launcher, and app-side SDK",
   "type": "module",
   "exports": {
