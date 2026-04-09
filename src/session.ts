@@ -82,7 +82,24 @@ export class CDPSession {
     }
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(url);
+        // RN >=0.85 targets expose supportsMultipleDebuggers and require an
+        // Origin header on the WebSocket upgrade (Metro validates it). Older
+        // versions (< 0.85) reject connections that include the header, so we
+        // only send it when the capability is present.
+        const needsOrigin = this.target?.reactNative?.capabilities?.supportsMultipleDebuggers === true;
+        const wsOptions = needsOrigin ? {
+          headers: {
+            Origin: (() => {
+              try {
+                const u = new URL(url.replace(/^wss?:\/\//, (m) => (m === 'wss://' ? 'https://' : 'http://')));
+                return `${u.protocol}//${u.host}`;
+              } catch {
+                return 'http://localhost:8081';
+              }
+            })(),
+          },
+        } : undefined;
+        this.ws = new WebSocket(url, wsOptions);
         const socketForThisConnection = this.ws;
 
         this.ws.on('open', () => {
