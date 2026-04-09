@@ -17,7 +17,7 @@ export async function fetchTargets(host: string, port: number): Promise<MetroTar
     });
     if (!response.ok) return [];
     const targets = (await response.json()) as MetroTarget[];
-    return targets.filter((t) => t.webSocketDebuggerUrl);
+    return targets;
   } catch {
     return [];
   }
@@ -28,13 +28,15 @@ export async function fetchTargets(host: string, port: number): Promise<MetroTar
  * Priority: Bridgeless > Hermes > standard RN (skips Reanimated/Experimental).
  */
 export function selectBestTarget(targets: MetroTarget[]): MetroTarget | null {
-  if (targets.length === 0) return null;
+  // Only consider targets that expose a CDP debugger endpoint
+  const debuggable = targets.filter((t) => t.webSocketDebuggerUrl);
+  if (debuggable.length === 0) return null;
 
-  const filtered = targets.filter(
+  const filtered = debuggable.filter(
     (t) => !t.title.includes('Reanimated') && !t.title.includes('Experimental'),
   );
 
-  if (filtered.length === 0) return targets[0];
+  if (filtered.length === 0) return debuggable[0];
 
   const bridgeless = filtered.find(
     (t) => t.title.includes('Bridgeless') || t.title.includes('React Native Bridge-less'),
