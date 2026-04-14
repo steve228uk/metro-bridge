@@ -82,11 +82,17 @@ export class CDPSession {
     }
     return new Promise((resolve, reject) => {
       try {
-        // RN >=0.85 targets expose supportsMultipleDebuggers and require an
-        // Origin header on the WebSocket upgrade (Metro validates it). Older
-        // versions (< 0.85) reject connections that include the header, so we
-        // only send it when the capability is present.
-        const needsOrigin = this.target?.reactNative?.capabilities?.supportsMultipleDebuggers === true;
+        // Metro 0.85+ validates the Origin header on /inspector/debug connections.
+        // We detect this in two complementary ways so the check is robust even
+        // when capability metadata is absent (manually-constructed targets, stale
+        // cached objects, or Metro not yet including the flag):
+        //   1. The target explicitly declares supportsMultipleDebuggers (RN 0.85+)
+        //   2. The URL uses the /inspector/debug path (Metro 0.85+ format)
+        // Older Metro versions don't validate Origin, so we only send it when
+        // at least one signal confirms we're talking to a 0.85+ inspector.
+        const needsOrigin =
+          this.target?.reactNative?.capabilities?.supportsMultipleDebuggers === true ||
+          /\/inspector\/debug(\?|$)/.test(url);
         const wsOptions = needsOrigin ? {
           headers: {
             Origin: (() => {
