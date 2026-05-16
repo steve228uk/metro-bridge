@@ -1,6 +1,6 @@
 {
   "name": "metro-bridge",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "CDP/Metro bridge for React Native: target discovery, WebSocket session, multiplexer, DevTools launcher, and app-side SDK",
   "type": "module",
   "exports": {
@@ -27,6 +27,7 @@
     "build:js": "bun build src/index.ts --outdir dist --target node --external ws --external chrome-launcher --external chromium-edge-launcher && bun build src/client/index.ts --outdir dist/client --target browser",
     "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
