@@ -5,22 +5,62 @@ import { createLogger } from './utils/logger.js';
 const logger = createLogger('discovery');
 
 const DEFAULT_PORTS = [8081, 8082, 19000, 19001, 19002];
+const LOCALHOST_FALLBACK_HOST = '127.0.0.1';
+const REQUEST_TIMEOUT_MS = 3000;
+
+type HostResult<T> = {
+  host: string;
+  result: T;
+};
+
+function metroUrl(host: string, port: number, path: string): string {
+  return `http://${host}:${port}${path}`;
+}
+
+function toHostResult<T>(host: string, result: T | null): HostResult<T> | null {
+  return result === null ? null : { host, result };
+}
+
+async function withLocalhostFallback<T>(
+  host: string,
+  fetchFromHost: (resolvedHost: string) => Promise<T | null>,
+): Promise<HostResult<T> | null> {
+  try {
+    return toHostResult(host, await fetchFromHost(host));
+  } catch {
+    if (host.toLowerCase() !== 'localhost') {
+      return null;
+    }
+  }
+
+  try {
+    return toHostResult(
+      LOCALHOST_FALLBACK_HOST,
+      await fetchFromHost(LOCALHOST_FALLBACK_HOST),
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTargetsWithHost(
+  host: string,
+  port: number,
+): Promise<HostResult<MetroTarget[]> | null> {
+  return withLocalhostFallback(host, async (resolvedHost) => {
+    const response = await fetch(metroUrl(resolvedHost, port, '/json'), {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as MetroTarget[];
+  });
+}
 
 /**
  * Fetch debuggable targets from a Metro server's /json endpoint.
  */
 export async function fetchTargets(host: string, port: number): Promise<MetroTarget[]> {
-  try {
-    const url = `http://${host}:${port}/json`;
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) return [];
-    const targets = (await response.json()) as MetroTarget[];
-    return targets;
-  } catch {
-    return [];
-  }
+  return (await fetchTargetsWithHost(host, port))?.result ?? [];
 }
 
 /**
@@ -62,10 +102,12 @@ export async function scanMetroPorts(
   const results: MetroServerInfo[] = [];
 
   await Promise.all(ports.map(async (port) => {
-    const targets = await fetchTargets(host, port);
-    if (targets.length > 0) {
-      results.push({ host, port, targets });
-      logger.info(`Found Metro server on port ${port} with ${targets.length} target(s)`);
+    const server = await fetchTargetsWithHost(host, port);
+    if (server && server.result.length > 0) {
+      results.push({ host: server.host, port, targets: server.result });
+      logger.info(
+        `Found Metro server on ${server.host}:${port} with ${server.result.length} target(s)`,
+      );
     }
   }));
 
@@ -92,15 +134,15 @@ export function supportsMultipleDebuggers(target: MetroTarget): boolean {
  * Check if Metro is running on the given host/port.
  */
 export async function checkMetroStatus(host: string, port: number): Promise<string | null> {
-  try {
-    const response = await fetch(`http://${host}:${port}/status`, {
-      signal: AbortSignal.timeout(3000),
+  const server = await withLocalhostFallback(host, async (resolvedHost) => {
+    const response = await fetch(metroUrl(resolvedHost, port, '/status'), {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (response.ok) return await response.text();
     return null;
-  } catch {
-    return null;
-  }
+  });
+
+  return server?.result ?? null;
 }
 
 /**
