@@ -11,8 +11,8 @@
  *   if (__DEV__) {
  *     const bridge = new MetroBridgeClient();
  *     bridge.registerCommand('login', async ({ email, password }) => { ... });
- *     bridge.useReduxMiddleware(store);
- *     bridge.useNavigationTracking(navigationRef);
+ *     bridge.wireReduxStore(store);
+ *     bridge.trackNavigation(navigationRef);
  *   }
  */
 
@@ -83,7 +83,7 @@ export class MetroBridgeClient {
 
   // ── Redux ────────────────────────────────────────────────────────────────
 
-  useReduxMiddleware(store: ReduxStore): void {
+  private configureRedux(store: ReduxStore): void {
     const { middleware, actions } = createReduxMiddleware();
     this.bridgeGlobal.redux = {
       actions,
@@ -93,18 +93,44 @@ export class MetroBridgeClient {
     store.__metroBridgeMiddleware = middleware;
   }
 
+  wireReduxStore(store: ReduxStore): void {
+    this.configureRedux(store);
+  }
+
+  /**
+   * @deprecated Use wireReduxStore(store) instead. This method name can be
+   * mistaken for a React Hook by React Compiler diagnostics in app code.
+   */
+  useReduxMiddleware(store: ReduxStore): void {
+    this.configureRedux(store);
+  }
+
   getReduxMiddleware(): unknown {
     if (!this.bridgeGlobal.redux) {
-      throw new Error('Call useReduxMiddleware(store) first');
+      throw new Error(
+        'Call wireReduxStore(store) first. Legacy callers can use useReduxMiddleware(store).',
+      );
     }
-    return (this.bridgeGlobal.redux as unknown as { actions: ClientBuffer<unknown> }).actions;
+    return this.bridgeGlobal.redux.actions;
   }
 
   // ── Navigation ───────────────────────────────────────────────────────────
 
-  useNavigationTracking(navigationRef: NavigationRef): void {
+  private configureNavigation(navigationRef: NavigationRef): void {
     const { events, getState } = createNavigationTracking(navigationRef);
     this.bridgeGlobal.navigation = { events, getState };
+  }
+
+  trackNavigation(navigationRef: NavigationRef): void {
+    this.configureNavigation(navigationRef);
+  }
+
+  /**
+   * @deprecated Use trackNavigation(navigationRef) instead. This method name can
+   * be mistaken for a React Hook by React Compiler diagnostics in app code.
+   */
+  useNavigationTracking(navigationRef: NavigationRef): void {
+    this.configureNavigation(navigationRef);
   }
 
   // ── Performance ──────────────────────────────────────────────────────────
