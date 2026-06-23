@@ -25,6 +25,29 @@ export interface MetroTarget {
   vm?: string;
 }
 
+export interface CDPCloseInfo {
+  code: number;
+  reason: string;
+  wasConnected: boolean;
+}
+
+export type CDPProbeFailureReason = 'closed' | 'timeout' | 'error';
+
+export type CDPProbeResult =
+  | {
+      ok: true;
+      method: string;
+      durationMs: number;
+    }
+  | {
+      ok: false;
+      reason: CDPProbeFailureReason;
+      method: string;
+      durationMs: number;
+      closeInfo?: CDPCloseInfo;
+      error?: string;
+    };
+
 /**
  * CDP message sent to the debugger.
  */

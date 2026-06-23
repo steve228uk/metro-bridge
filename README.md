@@ -84,7 +84,13 @@ await session.close()
 ### MetroDiscovery — target discovery
 
 ```ts
-import { MetroDiscovery, fetchTargets, selectBestTarget, scanMetroPorts } from 'metro-bridge'
+import {
+  MetroDiscovery,
+  fetchTargets,
+  scanMetroPorts,
+  selectBestTarget,
+  supportsMultipleDebuggers,
+} from 'metro-bridge'
 
 // Class API
 const discovery = new MetroDiscovery(8081)
@@ -98,8 +104,28 @@ const best = selectBestTarget(targets) // prefers Bridgeless > Hermes > standard
 const servers = await scanMetroPorts('127.0.0.1') // scans common ports
 
 // Check if the target supports native multi-session (RN 0.85+)
-if (supportsMultipleDebuggers(best)) {
+if (best && supportsMultipleDebuggers(best)) {
   // Multiple CDPSessions can connect to Metro directly — no CDPMultiplexer needed
+}
+```
+
+### probeCDPConnection — validate a target
+
+Use this when you want to check that a discovered target can answer a CDP command
+before choosing a direct connection or a fallback path.
+
+```ts
+import { MetroDiscovery, probeCDPConnection, selectBestTarget } from 'metro-bridge'
+
+const discovery = new MetroDiscovery(8081)
+const target = selectBestTarget(await discovery.discover())
+if (!target) {
+  throw new Error('No debuggable target found')
+}
+
+const probe = await probeCDPConnection(target, { timeoutMs: 1000 })
+if (!probe.ok) {
+  console.warn(`CDP probe failed: ${probe.reason}`, probe.closeInfo ?? probe.error)
 }
 ```
 
