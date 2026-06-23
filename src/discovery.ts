@@ -115,8 +115,9 @@ export async function scanMetroPorts(
 }
 
 /**
- * Returns true if the target is running on RN 0.85+ and Metro's inspector
- * proxy supports native multi-session. When true, multiple CDPSessions
+ * Returns true if the target advertises RN 0.85+ native multi-session support.
+ * Treat this as advisory: callers that depend on CDP should still probe the
+ * target before skipping compatibility fallbacks. When reliable, multiple CDPSessions
  * (e.g. metro-bridge + Chrome DevTools) can connect to Metro concurrently
  * without a CDPMultiplexer.
  *

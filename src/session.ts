@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import type { CDPRequest, CDPResponse, MetroTarget } from './types.js';
+import type { CDPCloseInfo, CDPRequest, CDPResponse, MetroTarget } from './types.js';
 import { createLogger } from './utils/logger.js';
 import { wsDataToString } from './utils/ws.js';
 
@@ -31,6 +31,7 @@ export class CDPSession {
   private _isConnected = false;
   private target: MetroTarget | null = null;
   private lastPingAt = 0;
+  private lastCloseInfo: CDPCloseInfo | null = null;
 
   /**
    * Optional interceptor for parsed incoming CDP messages.
@@ -60,6 +61,7 @@ export class CDPSession {
   async connectToTarget(target: MetroTarget): Promise<void> {
     this.stopKeepAlive();
     this.target = target;
+    this.lastCloseInfo = null;
     this.suppressReconnect = false;
     this.connectingPromise = this.doConnect(target.webSocketDebuggerUrl);
     await this.connectingPromise;
@@ -82,34 +84,24 @@ export class CDPSession {
     }
     return new Promise((resolve, reject) => {
       try {
-        // Metro 0.85+ validates the Origin header on /inspector/debug connections.
-        // We detect this in two complementary ways so the check is robust even
-        // when capability metadata is absent (manually-constructed targets, stale
-        // cached objects, or Metro not yet including the flag):
-        //   1. The target explicitly declares supportsMultipleDebuggers (RN 0.85+)
-        //   2. The URL uses the /inspector/debug path (Metro 0.85+ format)
-        // Older Metro versions don't validate Origin, so we only send it when
-        // at least one signal confirms we're talking to a 0.85+ inspector.
+        // Metro 0.85+ validates the Origin header on debugger connections and
+        // advertises native multi-debugger support explicitly. RN <0.85 Fusebox
+        // also uses /inspector/debug, but closes the socket when Origin is sent.
         const needsOrigin =
-          this.target?.reactNative?.capabilities?.supportsMultipleDebuggers === true ||
-          /\/inspector\/debug(\?|$)/.test(url);
+          this.target?.reactNative?.capabilities?.supportsMultipleDebuggers === true;
         const wsOptions = needsOrigin ? {
           headers: {
-            Origin: (() => {
-              try {
-                const u = new URL(url.replace(/^wss?:\/\//, (m) => (m === 'wss://' ? 'https://' : 'http://')));
-                return `${u.protocol}//${u.host}`;
-              } catch {
-                return 'http://localhost:8081';
-              }
-            })(),
+            Origin: getMetroOrigin(url),
           },
         } : undefined;
         this.ws = new WebSocket(url, wsOptions);
         const socketForThisConnection = this.ws;
 
         this.ws.on('open', () => {
+          if (this.ws !== socketForThisConnection) return;
+
           this._isConnected = true;
+          this.lastCloseInfo = null;
           this.lastPingAt = Date.now();
           this.startKeepAlive();
           logger.info(`Connected to ${this.target?.title || 'unknown'}`);
@@ -117,23 +109,34 @@ export class CDPSession {
         });
 
         this.ws.on('message', (data) => {
+          if (this.ws !== socketForThisConnection) return;
+
           this.handleMessage(wsDataToString(data));
         });
 
         this.ws.on('close', (code, reason) => {
           if (this.ws !== socketForThisConnection) return;
 
-          logger.info(`WebSocket closed (code=${code}, reason="${reason.toString() || 'no reason'}", wasConnected=${this._isConnected})`);
+          const closeInfo: CDPCloseInfo = {
+            code,
+            reason: reason.toString() || 'no reason',
+            wasConnected: this._isConnected,
+          };
+          this.lastCloseInfo = closeInfo;
+
+          logger.info(`WebSocket closed (code=${closeInfo.code}, reason="${closeInfo.reason}", wasConnected=${closeInfo.wasConnected})`);
 
           this._isConnected = false;
           this.stopKeepAlive();
           this.rejectAllPending('WebSocket closed');
           if (!this.suppressReconnect) {
-            this.emit('disconnected', {});
+            this.emit('disconnected', { ...closeInfo });
           }
         });
 
         this.ws.on('error', () => {
+          if (this.ws !== socketForThisConnection) return;
+
           logger.error(`WebSocket error (connected=${this._isConnected})`);
           if (!this._isConnected) {
             reject(new Error('Failed to connect to CDP target'));
@@ -145,6 +148,8 @@ export class CDPSession {
         // Only update lastPingAt on actual WebSocket pings so the keepalive
         // correctly detects dead connections and triggers a reconnect.
         this.ws.on('ping', () => {
+          if (this.ws !== socketForThisConnection) return;
+
           this.lastPingAt = Date.now();
           logger.debug('Received ping from Metro');
         });
@@ -207,6 +212,10 @@ export class CDPSession {
    */
   getTarget(): MetroTarget | null {
     return this.target;
+  }
+
+  getLastCloseInfo(): CDPCloseInfo | null {
+    return this.lastCloseInfo;
   }
 
   /**
@@ -309,5 +318,17 @@ export class CDPSession {
         }
       }
     }
+  }
+}
+
+function getMetroOrigin(webSocketUrl: string): string {
+  try {
+    const url = new URL(webSocketUrl.replace(/^wss?:\/\//, (match) => (match === 'wss://' ? 'https://' : 'http://')));
+    if (url.hostname === 'localhost') {
+      url.hostname = '127.0.0.1';
+    }
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return 'http://127.0.0.1:8081';
   }
 }

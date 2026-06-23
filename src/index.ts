@@ -9,13 +9,18 @@ export {
 } from './discovery.js';
 export { CDPMultiplexer } from './multiplexer.js';
 export { MetroBridge } from './bridge.js';
+export { probeCDPConnection } from './probe.js';
 export { openDevTools } from './devtools.js';
 export { TimeoutError } from './utils/poll.js';
 export type {
   MetroTarget,
   MetroServerInfo,
+  CDPCloseInfo,
   CDPRequest,
   CDPResponse,
+  CDPProbeFailureReason,
+  CDPProbeResult,
   ConsoleHandler,
   MockResponse,
 } from './types.js';
+export type { CDPProbeOptions } from './probe.js';
