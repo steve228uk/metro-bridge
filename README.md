@@ -199,12 +199,12 @@ if (__DEV__) {
   })
 
   // Capture Redux actions
-  client.useReduxMiddleware(store)
-  // Then add the middleware to your store:
+  client.wireReduxStore(store)
+  // Then include the assigned middleware in your store setup:
   // configureStore({ middleware: (getDefault) => getDefault().concat(store.__metroBridgeMiddleware) })
 
   // Track React Navigation state changes
-  client.useNavigationTracking(navigationRef)
+  client.trackNavigation(navigationRef)
 
   // Track lifecycle events (foreground/background/deep links)
   client.trackLifecycle()
