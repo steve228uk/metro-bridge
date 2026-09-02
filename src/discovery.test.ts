@@ -46,8 +46,9 @@ describe('Metro target classification', () => {
     expect(
       classifyMetroTarget(
         target('modern', {
-          title: 'My App',
+          title: 'Hermes React Native',
           description: '',
+          appId: 'com.example.app',
           reactNative: { capabilities: { nativePageReloads: true } },
         }),
       ),
@@ -89,6 +90,30 @@ describe('Metro target classification', () => {
     }
   });
 
+  test('does not treat a device capability as app-page identity', () => {
+    expect(
+      classifyMetroTarget(
+        target('custom-runtime', {
+          title: 'remend-processor',
+          description: 'com.example.app',
+          appId: 'com.example.app',
+          reactNative: { capabilities: { nativePageReloads: true } },
+        }),
+      ),
+    ).toEqual({ attachable: false, reason: 'auxiliary-runtime' });
+  });
+
+  test('allows experimental in a legitimate application name', () => {
+    expect(
+      classifyMetroTarget(
+        target('experimental-app', {
+          title: 'React Native Experimental Gallery',
+          description: 'React Native application',
+        }),
+      ),
+    ).toEqual({ attachable: true });
+  });
+
   test('rejects synthetic reload and negative page targets', () => {
     expect(
       classifyMetroTarget(
@@ -118,8 +143,9 @@ describe('Metro target classification', () => {
       title: 'React Native Bridgeless',
     });
     const modern = target('modern', {
-      title: 'My App',
+      title: 'Hermes React Native',
       description: '',
+      appId: 'com.example.app',
       reactNative: { capabilities: { nativePageReloads: true } },
     });
 

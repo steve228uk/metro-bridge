@@ -101,8 +101,7 @@ function identifiesAuxiliaryRuntime(target: MetroTarget): boolean {
   return (
     identity.includes('worklet') ||
     identity.includes('reanimated') ||
-    identity.includes('ui runtime') ||
-    identity.includes('experimental')
+    identity.includes('ui runtime')
   );
 }
 
@@ -123,10 +122,10 @@ export function classifyMetroTarget(
   if (identifiesAuxiliaryRuntime(target)) {
     return { attachable: false, reason: 'auxiliary-runtime' };
   }
-  if (
-    target.reactNative?.capabilities?.nativePageReloads === true ||
-    identifiesReactNativeApp(target)
-  ) {
+  // Capability flags may be copied to auxiliary pages by some Metro/device
+  // combinations. Treat them as priority hints only after the page itself has
+  // positively identified as the React Native application runtime.
+  if (identifiesReactNativeApp(target)) {
     return { attachable: true };
   }
   return { attachable: false, reason: 'auxiliary-runtime' };
