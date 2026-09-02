@@ -86,6 +86,7 @@ await session.close()
 ```ts
 import {
   MetroDiscovery,
+  classifyMetroTarget,
   fetchTargets,
   scanMetroPorts,
   selectBestTarget,
@@ -100,7 +101,11 @@ const running = await discovery.isMetroRunning()
 
 // Standalone functions
 const targets = await fetchTargets('127.0.0.1', 8081)
-const best = selectBestTarget(targets) // prefers Bridgeless > Hermes > standard
+const classified = targets.map((target) => ({
+  target,
+  ...classifyMetroTarget(target),
+}))
+const best = selectBestTarget(targets) // modern app > legacy Bridgeless > legacy RN
 const servers = await scanMetroPorts('127.0.0.1') // scans common ports
 
 // Check if the target supports native multi-session (RN 0.85+)

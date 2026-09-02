@@ -1,4 +1,8 @@
-import type { MetroTarget, MetroServerInfo } from './types.js';
+import type {
+  MetroTarget,
+  MetroServerInfo,
+  MetroTargetClassification,
+} from './types.js';
 import { CDPSession } from './session.js';
 import { createLogger } from './utils/logger.js';
 
@@ -63,32 +67,96 @@ export async function fetchTargets(host: string, port: number): Promise<MetroTar
   return (await fetchTargetsWithHost(host, port))?.result ?? [];
 }
 
+function isSyntheticReloadTarget(target: MetroTarget): boolean {
+  const identity = `${target.title} ${target.description} ${target.vm ?? ''}`.toLowerCase();
+  if (
+    identity.includes('experimental') &&
+    (identity.includes('reload') || identity.includes("don't use"))
+  ) {
+    return true;
+  }
+
+  if (target.id === '-1' || target.id.endsWith('--1')) return true;
+
+  try {
+    const page = new URL(target.webSocketDebuggerUrl!).searchParams.get('page');
+    return page !== null && /^-\d+$/.test(page);
+  } catch {
+    return false;
+  }
+}
+
+function identifiesReactNativeApp(target: MetroTarget): boolean {
+  const identity = `${target.title} ${target.description}`.toLowerCase();
+  return (
+    identity.includes('react native') ||
+    identity.includes('react-native') ||
+    identity.includes('bridgeless') ||
+    identity.includes('bridge-less')
+  );
+}
+
+function identifiesAuxiliaryRuntime(target: MetroTarget): boolean {
+  const identity = `${target.title} ${target.description} ${target.vm ?? ''}`.toLowerCase();
+  return (
+    identity.includes('worklet') ||
+    identity.includes('reanimated') ||
+    identity.includes('ui runtime') ||
+    identity.includes('experimental')
+  );
+}
+
 /**
- * Select the best target from a list.
- * Priority: Bridgeless > Hermes > standard RN (skips Reanimated/Experimental).
+ * Classify whether a Metro inspector target is safe to attach to as the app
+ * runtime. Classification is deliberately allowlist-based: auxiliary Hermes
+ * runtimes and worklets can expose fully functional CDP URLs too.
+ */
+export function classifyMetroTarget(
+  target: MetroTarget,
+): MetroTargetClassification {
+  if (!target.webSocketDebuggerUrl) {
+    return { attachable: false, reason: 'missing-debugger-url' };
+  }
+  if (isSyntheticReloadTarget(target)) {
+    return { attachable: false, reason: 'synthetic-reload-target' };
+  }
+  if (identifiesAuxiliaryRuntime(target)) {
+    return { attachable: false, reason: 'auxiliary-runtime' };
+  }
+  if (
+    target.reactNative?.capabilities?.nativePageReloads === true ||
+    identifiesReactNativeApp(target)
+  ) {
+    return { attachable: true };
+  }
+  return { attachable: false, reason: 'auxiliary-runtime' };
+}
+
+function targetPriority(target: MetroTarget): number {
+  if (target.reactNative?.capabilities?.nativePageReloads === true) return 3;
+  const identity = `${target.title} ${target.description}`.toLowerCase();
+  if (identity.includes('bridgeless') || identity.includes('bridge-less')) {
+    return 2;
+  }
+  return 1;
+}
+
+/**
+ * Select the best attachable app runtime from a list.
+ * Priority: modern native-page targets > legacy Bridgeless > legacy RN.
  */
 export function selectBestTarget(targets: MetroTarget[]): MetroTarget | null {
-  // Only consider targets that expose a CDP debugger endpoint
-  const debuggable = targets.filter((t) => t.webSocketDebuggerUrl);
-  if (debuggable.length === 0) return null;
-
-  const filtered = debuggable.filter(
-    (t) => !t.title.includes('Reanimated') && !t.title.includes('Experimental'),
-  );
-
-  if (filtered.length === 0) return debuggable[0];
-
-  const bridgeless = filtered.find(
-    (t) => t.title.includes('Bridgeless') || t.title.includes('React Native Bridge-less'),
-  );
-  if (bridgeless) return bridgeless;
-
-  const hermes = filtered.find(
-    (t) => t.title.includes('Hermes') || t.vm === 'Hermes',
-  );
-  if (hermes) return hermes;
-
-  return filtered[0];
+  let best: MetroTarget | null = null;
+  let bestPriority = 0;
+  for (const target of targets) {
+    if (!classifyMetroTarget(target).attachable) continue;
+    const priority = targetPriority(target);
+    if (priority > bestPriority) {
+      best = target;
+      bestPriority = priority;
+    }
+  }
+  return best;
 }
 
 /**

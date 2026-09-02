@@ -59,6 +59,9 @@ export class CDPSession {
    * Connect to a CDP target.
    */
   async connectToTarget(target: MetroTarget): Promise<void> {
+    if (!target.webSocketDebuggerUrl) {
+      throw new Error(`Metro target ${target.id} has no debugger WebSocket URL`);
+    }
     this.stopKeepAlive();
     this.target = target;
     this.lastCloseInfo = null;

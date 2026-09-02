@@ -3,11 +3,13 @@
  */
 export interface MetroTarget {
   id: string;
+  /** Stable application identity supplied by Metro's inspector proxy. */
+  appId?: string;
   title: string;
   description: string;
   type: string;
   devtoolsFrontendUrl?: string;
-  webSocketDebuggerUrl: string;
+  webSocketDebuggerUrl?: string;
   faviconUrl?: string;
   url?: string;
   deviceName?: string;
@@ -24,6 +26,15 @@ export interface MetroTarget {
   };
   vm?: string;
 }
+
+export type MetroTargetRejectionReason =
+  | 'missing-debugger-url'
+  | 'synthetic-reload-target'
+  | 'auxiliary-runtime';
+
+export type MetroTargetClassification =
+  | { attachable: true }
+  | { attachable: false; reason: MetroTargetRejectionReason };
 
 export interface CDPCloseInfo {
   code: number;
