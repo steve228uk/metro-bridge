@@ -22,13 +22,11 @@
     "dist"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "bun run clean && bun run build:js && bun run build:types",
-    "build:js": "bun build src/index.ts --outdir dist --target node --external ws --external chrome-launcher --external chromium-edge-launcher && bun build src/client/index.ts --outdir dist/client --target browser",
-    "build:types": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "prepare": "bun run build"
+    "prepare": "npm run build"
   },
   "dependencies": {
     "ws": "^8.20.0"
