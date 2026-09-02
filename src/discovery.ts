@@ -68,14 +68,7 @@ export async function fetchTargets(host: string, port: number): Promise<MetroTar
 }
 
 function isSyntheticReloadTarget(target: MetroTarget): boolean {
-  const identity = `${target.title} ${target.description} ${target.vm ?? ''}`.toLowerCase();
-  if (
-    identity.includes('experimental') &&
-    (identity.includes('reload') || identity.includes("don't use"))
-  ) {
-    return true;
-  }
-
+  // Application display names are not a synthetic-page signature.
   if (target.id === '-1' || target.id.endsWith('--1')) return true;
 
   try {

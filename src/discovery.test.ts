@@ -114,6 +114,18 @@ describe('Metro target classification', () => {
     ).toEqual({ attachable: true });
   });
 
+  test('allows experimental reload wording on a normal app page', () => {
+    const runtime = target('page-42', {
+      title: 'React Native Experimental Reload Gallery',
+      description: 'React Native application',
+      webSocketDebuggerUrl:
+        'ws://127.0.0.1:8081/inspector/debug?page=42',
+    });
+
+    expect(classifyMetroTarget(runtime)).toEqual({ attachable: true });
+    expect(selectBestTarget([runtime])).toBe(runtime);
+  });
+
   test('rejects synthetic reload and negative page targets', () => {
     expect(
       classifyMetroTarget(
