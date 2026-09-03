@@ -2,6 +2,7 @@ export { CDPSession } from './session.js';
 export {
   MetroDiscovery,
   fetchTargets,
+  classifyMetroTarget,
   selectBestTarget,
   scanMetroPorts,
   checkMetroStatus,
@@ -14,6 +15,8 @@ export { openDevTools } from './devtools.js';
 export { TimeoutError } from './utils/poll.js';
 export type {
   MetroTarget,
+  MetroTargetClassification,
+  MetroTargetRejectionReason,
   MetroServerInfo,
   CDPCloseInfo,
   CDPRequest,

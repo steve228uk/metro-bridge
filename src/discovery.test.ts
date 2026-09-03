@@ -3,9 +3,11 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   checkMetroStatus,
+  classifyMetroTarget,
   fetchTargets,
   MetroDiscovery,
   scanMetroPorts,
+  selectBestTarget,
 } from './discovery.js';
 import type { MetroTarget } from './types.js';
 
@@ -23,6 +25,145 @@ const targets: MetroTarget[] = [
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+function target(
+  id: string,
+  overrides: Partial<MetroTarget> = {},
+): MetroTarget {
+  return {
+    id,
+    title: 'Hermes React Native',
+    description: 'React Native instance',
+    type: 'node',
+    webSocketDebuggerUrl: `ws://127.0.0.1:8081/inspector/debug?page=${id}`,
+    ...overrides,
+  };
+}
+
+describe('Metro target classification', () => {
+  test('accepts modern and legacy app runtimes', () => {
+    expect(
+      classifyMetroTarget(
+        target('modern', {
+          title: 'Hermes React Native',
+          description: '',
+          appId: 'com.example.app',
+          reactNative: { capabilities: { nativePageReloads: true } },
+        }),
+      ),
+    ).toEqual({ attachable: true });
+    expect(classifyMetroTarget(target('legacy'))).toEqual({
+      attachable: true,
+    });
+    expect(
+      classifyMetroTarget(
+        target('bridgeless', {
+          title: 'Bridgeless Runtime',
+          description: '',
+        }),
+      ),
+    ).toEqual({ attachable: true });
+  });
+
+  test('rejects targets without debugger URLs', () => {
+    expect(
+      classifyMetroTarget(target('missing', { webSocketDebuggerUrl: undefined })),
+    ).toEqual({ attachable: false, reason: 'missing-debugger-url' });
+  });
+
+  test('rejects arbitrary Hermes, worklet, Reanimated, and UI runtimes', () => {
+    for (const runtime of [
+      target('hermes', { title: 'Hermes', description: '' }),
+      target('anonymous', { title: 'anonymous', description: 'worklet' }),
+      target('named', {
+        title: 'React Native animations',
+        description: 'Worklet Runtime',
+      }),
+      target('reanimated', { title: 'Reanimated Runtime', description: '' }),
+      target('ui', { title: 'UI Runtime', description: '' }),
+    ]) {
+      expect(classifyMetroTarget(runtime)).toEqual({
+        attachable: false,
+        reason: 'auxiliary-runtime',
+      });
+    }
+  });
+
+  test('does not treat a device capability as app-page identity', () => {
+    expect(
+      classifyMetroTarget(
+        target('custom-runtime', {
+          title: 'remend-processor',
+          description: 'com.example.app',
+          appId: 'com.example.app',
+          reactNative: { capabilities: { nativePageReloads: true } },
+        }),
+      ),
+    ).toEqual({ attachable: false, reason: 'auxiliary-runtime' });
+  });
+
+  test('allows experimental in a legitimate application name', () => {
+    expect(
+      classifyMetroTarget(
+        target('experimental-app', {
+          title: 'React Native Experimental Gallery',
+          description: 'React Native application',
+        }),
+      ),
+    ).toEqual({ attachable: true });
+  });
+
+  test('allows experimental reload wording on a normal app page', () => {
+    const runtime = target('page-42', {
+      title: 'React Native Experimental Reload Gallery',
+      description: 'React Native application',
+      webSocketDebuggerUrl:
+        'ws://127.0.0.1:8081/inspector/debug?page=42',
+    });
+
+    expect(classifyMetroTarget(runtime)).toEqual({ attachable: true });
+    expect(selectBestTarget([runtime])).toBe(runtime);
+  });
+
+  test('rejects synthetic reload and negative page targets', () => {
+    expect(
+      classifyMetroTarget(
+        target('device--1', {
+          title: 'React Native Experimental (Improved Chrome Reloads)',
+          description: 'React Native',
+          vm: "don't use",
+          webSocketDebuggerUrl:
+            'ws://127.0.0.1:8081/inspector/debug?page=-1',
+        }),
+      ),
+    ).toEqual({ attachable: false, reason: 'synthetic-reload-target' });
+  });
+
+  test('returns null rather than falling back when every target is unsafe', () => {
+    expect(
+      selectBestTarget([
+        target('worklet', { title: 'anonymous', description: 'worklet' }),
+        target('missing', { webSocketDebuggerUrl: undefined }),
+      ]),
+    ).toBeNull();
+  });
+
+  test('prioritizes modern app runtimes, then Bridgeless, then legacy RN', () => {
+    const legacy = target('legacy');
+    const bridgeless = target('bridgeless', {
+      title: 'React Native Bridgeless',
+    });
+    const modern = target('modern', {
+      title: 'Hermes React Native',
+      description: '',
+      appId: 'com.example.app',
+      reactNative: { capabilities: { nativePageReloads: true } },
+    });
+
+    expect(selectBestTarget([legacy, bridgeless])).toBe(bridgeless);
+    expect(selectBestTarget([legacy, bridgeless, modern])).toBe(modern);
+  });
 });
 
 async function createMetroServer(): Promise<{ server: Server; port: number }> {

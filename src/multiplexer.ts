@@ -163,9 +163,12 @@ export class CDPMultiplexer {
         description: target.description || '',
         devtoolsFrontendUrl: this.getDevToolsUrl(),
         id: target.id,
+        ...(target.appId ? { appId: target.appId } : {}),
         title: target.title,
         type: 'node',
         webSocketDebuggerUrl: `ws://localhost:${this._port}`,
+        ...(target.deviceName ? { deviceName: target.deviceName } : {}),
+        ...(target.reactNative ? { reactNative: target.reactNative } : {}),
         ...(target.vm ? { vm: target.vm } : {}),
       }] : [];
 

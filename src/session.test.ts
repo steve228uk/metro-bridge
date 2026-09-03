@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { CDPSession } from './session.js';
 import type { MetroTarget } from './types.js';
@@ -26,13 +28,12 @@ async function captureOriginHeader(
   capabilities: ReactNativeCapabilities,
   host?: string,
 ): Promise<string | undefined> {
-  const wss = new WebSocketServer({ port: 0 });
+  const httpServer = createServer();
+  const wss = new WebSocketServer({ server: httpServer });
   const sockets = new Set<WebSocket>();
   const port = await new Promise<number>((resolve) => {
-    wss.on('listening', () => {
-      const address = wss.address();
-      if (typeof address !== 'object' || !address) throw new Error('Expected TCP address');
-      resolve(address.port);
+    httpServer.listen(0, '127.0.0.1', () => {
+      resolve((httpServer.address() as AddressInfo).port);
     });
   });
 
@@ -41,7 +42,6 @@ async function captureOriginHeader(
       sockets.add(ws);
       ws.on('close', () => sockets.delete(ws));
       resolve(req.headers.origin);
-      ws.terminate();
     });
   });
 
@@ -55,6 +55,7 @@ async function captureOriginHeader(
       socket.terminate();
     }
     wss.close();
+    httpServer.close();
   }
 }
 
