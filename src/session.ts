@@ -15,7 +15,7 @@ interface PendingRequest {
 
 /** Options for an individual CDP request. */
 export interface CDPSendOptions {
-  /** Maximum time to wait for the response, in milliseconds. */
+  /** Maximum response wait in milliseconds; positive and at most 2,147,483,647. */
   timeoutMs?: number;
 }
 
@@ -177,8 +177,8 @@ export class CDPSession {
     options?: CDPSendOptions,
   ): Promise<TResult> {
     const timeoutMs = options?.timeoutMs ?? this.requestTimeout;
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-      throw new RangeError('CDP request timeout must be a finite positive number');
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+      throw new RangeError('CDP request timeout must be a finite positive number no greater than 2147483647');
     }
 
     if (!this.ws || !this._isConnected) {

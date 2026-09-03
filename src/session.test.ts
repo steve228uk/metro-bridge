@@ -154,6 +154,9 @@ describe('CDPSession request timeouts', () => {
     await expect(resource.session.send('Runtime.enable', undefined, { timeoutMs: Number.POSITIVE_INFINITY })).rejects.toThrow(
       'finite positive number',
     );
+    await expect(resource.session.send('Runtime.enable', undefined, { timeoutMs: 2_147_483_648 })).rejects.toThrow(
+      'no greater than 2147483647',
+    );
     expect(pendingRequestCount(resource.session)).toBe(0);
   });
 
