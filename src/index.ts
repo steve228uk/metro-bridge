@@ -1,4 +1,5 @@
 export { CDPSession } from './session.js';
+export type { CDPSendOptions } from './session.js';
 export {
   MetroDiscovery,
   fetchTargets,
