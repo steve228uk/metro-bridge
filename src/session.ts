@@ -13,6 +13,12 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** Options for an individual CDP request. */
+export interface CDPSendOptions {
+  /** Maximum time to wait for the response, in milliseconds. */
+  timeoutMs?: number;
+}
+
 /**
  * CDP WebSocket client that connects to a Hermes debugger target.
  *
@@ -165,7 +171,16 @@ export class CDPSession {
   /**
    * Send a CDP command and wait for the response.
    */
-  async send<TResult = unknown>(method: string, params?: Record<string, unknown>): Promise<TResult> {
+  async send<TResult = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+    options?: CDPSendOptions,
+  ): Promise<TResult> {
+    const timeoutMs = options?.timeoutMs ?? this.requestTimeout;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new RangeError('CDP request timeout must be a finite positive number');
+    }
+
     if (!this.ws || !this._isConnected) {
       throw new Error('Not connected to CDP target');
     }
@@ -178,14 +193,21 @@ export class CDPSession {
       const timer = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new Error(`CDP request timed out: ${method}`));
-      }, this.requestTimeout);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, {
         resolve: v => resolve(v as TResult),
         reject,
         timer,
       });
-      this.ws!.send(JSON.stringify(request));
+
+      try {
+        this.ws!.send(JSON.stringify(request));
+      } catch (error) {
+        clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 

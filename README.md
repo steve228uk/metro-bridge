@@ -73,10 +73,19 @@ const result = await session.send('Runtime.evaluate', {
   returnByValue: true,
 })
 
+// Override the default 30-second response timeout for this request
+const quickResult = await session.send('Runtime.evaluate', {
+  expression: 'Date.now()',
+  returnByValue: true,
+}, { timeoutMs: 1000 })
+
 // Listen for CDP events
 session.on('Runtime.consoleAPICalled', (params) => {
   console.log(params)
 })
+
+// `send()` uses a 30-second timeout by default. Pass `{ timeoutMs }` as the
+// third argument when a command needs a different response deadline.
 
 await session.close()
 ```
